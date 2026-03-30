@@ -9,6 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from config.settings import get_settings
+from src.api.error_handlers import register_error_handlers
+from src.api.routes.quotes import router as quotes_router
 
 # Configure logging
 logging.basicConfig(
@@ -24,9 +26,19 @@ settings = get_settings()
 app = FastAPI(
     title=settings.api_title,
     version=settings.api_version,
-    description="Lending Insurance Quotation System API",
+    description="Lending Insurance Quotation System API - Calculate premium, brokerage, and installments for lending insurance products",
     docs_url="/api/docs",
+    redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
+    contact={
+        "name": "API Support",
+        "url": "https://github.com/seguros-api",
+        "email": "support@seguros.example.com",
+    },
+    license_info={
+        "name": "MIT License",
+        "url": "https://opensource.org/licenses/MIT",
+    },
 )
 
 # Configure CORS middleware
@@ -108,6 +120,17 @@ async def global_exception_handler(request: Request, exc: Exception):
 async def startup():
     """Application startup event."""
     logger.info(f"Starting {settings.api_title} v{settings.api_version}")
+# Register error handlers
+register_error_handlers(app)
+
+# Include routers with API version prefix
+app.include_router(
+    quotes_router,
+    prefix="/api/v1",
+    tags=["Quotes"],
+)
+
+
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"Database: {settings.database_url}")
 
