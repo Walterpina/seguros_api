@@ -555,4 +555,4 @@ MIT License - see [LICENSE](./LICENSE) file
 
 ---
 
-## Made with ❤️ for Itaú Insurance Assessment
+## Made with ❤️

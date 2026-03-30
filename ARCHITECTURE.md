@@ -438,6 +438,74 @@ This ensures:
 
 ---
 
+## Architecture Decisions & Trade-offs
+
+### Database: PostgreSQL vs DynamoDB
+
+| Criterion | PostgreSQL | DynamoDB | Our Choice |
+|-----------|-----------|----------|-----------|
+| **ACID Compliance** | ✅ Full ACID (Atomicity, Consistency, Isolation, Durability) | ⚠️ Eventually consistent (single item ACID only) | **PostgreSQL** |
+| **Financial Precision** | ✅ Decimal(19,2) for exact money representation | ❌ Float/number loses precision (e.g., 100.10 → 100.099999) | **PostgreSQL** |
+| **Transactions** | ✅ Multi-row commits w/ rollback | ❌ Single-item transactions only | **PostgreSQL** |
+| **JOIN Operations** | ✅ powerful JOINs (quotes + users + orgs) | ❌ No JOINs; requires denormalization | **PostgreSQL** |
+| **Query Complexity** | ✅ Complex WHERE/GROUP BY/HAVING | ❌ Limited to key conditions | **PostgreSQL** |
+| **Cost (Small Scale)** | ✅ Cheap ($15-50/month on RDS) | ⚠️ Can be expensive (pay per request) | **PostgreSQL** |
+| **Cost (Large Scale)** | ⚠️ Higher compute resources needed | ✅ Scales automatically | **DynamoDB** |
+| **Latency** | ✅ <10ms for indexed queries | ✅ <5ms single-item lookup | Tie |
+| **Compliance (Financial)** | ✅ Audit trails via event logs | ⚠️ Harder to audit mutations | **PostgreSQL** |
+
+**Decision Rationale**:
+- Insurance quotations are **financial records** requiring exact decimal precision
+- Single-item consistency insufficient for multi-row operations (org isolation + quote integrity)
+- ACID guarantees critical for regulatory compliance
+- DynamoDB better suited for real-time analytics or IoT telemetry, not financial systems
+
+---
+
+### Authentication: HS256 vs RS256
+
+| Criterion | HS256 (Symmetric) | RS256 (Asymmetric) | Our Choice |
+|-----------|----------|----------|-----------|
+| **Secret Management** | ⚠️ Shared secret (same for signing & verifying) | ✅ Private key (server only), public key (clients) | **HS256** |
+| **Key Distribution** | ❌ Hard to share secret safely across services | ✅ Public key can be shared openly | **RS256** |
+| **Performance** | ✅ Fast HMAC computation | ⚠️ Slower RSA operations | **HS256** |
+| **Multi-Service Auth** | ❌ All services need same secret (risky) | ✅ Each service verifies with public key | **RS256** |
+| **Token Revocation** | ⚠️ Cannot revoke (TTL-based only) | ⚠️ Cannot revoke (TTL-based only) | Tie |
+| **Security (Token Tampering)** | ✅ Any tampering invalidates signature | ✅ Any tampering invalidates signature | Tie |
+| **Replay Attack Vulnerability** | Mitigated by TTL (24h) | Mitigated by TTL (24h) | Tie |
+| **Infrastructure Simplicity** | ✅ Single secret in .env | ⚠️ Manage private/public key pairs | **HS256** |
+
+**Decision Rationale**:
+- MVP is **single-service architecture** (only one FastAPI server)
+- HS256 sufficient for single-service (secret only in API, never exposed)
+- Complexity of key rotation not justified for 24h token TTL
+- If expanding to **microservices** (future Phase 2), **RS256 recommended** with:
+  ```
+  - Central Auth Service (signs with private key)
+  - Microservices verify with public key (retrieved from Auth Service)
+  - Each service doesn't need secret
+  ```
+- **Roadmap**: Consider OAuth 2.0 + OpenID Connect for Phase 3 (Itaú integration)
+
+**Migration Path** (if needed later):
+```python
+# Current: HS256
+token = jwt.encode(
+    {"user_id": user.id}, 
+    settings.secret_key,  # Shared secret
+    algorithm="HS256"
+)
+
+# Future: RS256
+token = jwt.encode(
+    {"user_id": user.id},
+    private_key,  # Only Auth Service has this
+    algorithm="RS256"
+)
+```
+
+---
+
 ## Future Enhancements
 
 ### Phase 2 (Production Hardening)
