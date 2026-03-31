@@ -5,6 +5,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
 
 from src.api.schemas.quote_schemas import (
     ErrorResponse,
@@ -21,6 +22,7 @@ from src.application.use_cases.create_quote import CreateQuoteUseCase
 from src.application.use_cases.delete_quote import DeleteQuoteUseCase
 from src.application.use_cases.get_quote import GetQuoteUseCase
 from src.application.use_cases.list_quotes import ListQuotesUseCase
+from src.infrastructure.database.database import get_db
 from src.infrastructure.repositories.sql_quote_repository import SQLQuoteRepository
 
 # Create API router
@@ -68,6 +70,7 @@ router = APIRouter(
 async def post_create_quote(
     request: QuoteCreateRequest,
     current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> QuoteResponse:
     """
     Create a new insurance quote.
@@ -143,35 +146,25 @@ async def post_create_quote(
             brokerage_rate=request.brokerage_rate,
         )
 
-        # Initialize services and repositories (MVP: in-memory or mock)
-        # In production, use dependency injection
-        from sqlalchemy.orm import Session
-
-        # Create mock repository for MVP (would use real DB session in production)
-        # repository = SQLQuoteRepository(db_session)
+        repository = SQLQuoteRepository(db)
         calc_service = QuoteCalculationService()
         config_service = ConfigurationService()
 
-        # Execute use case (without persistence in MVP demo)
-        # For testing purposes, create and return without persistence
-        quote_entity = calc_service.create_quote(
-            loan_value=domain_request.loan_value,
-            premium_rate=domain_request.premium_rate or config_service.get_current_rates(
-                current_user.organization_id
-            ).premium_rate,
-            brokerage_rate=domain_request.brokerage_rate or config_service.get_current_rates(
-                current_user.organization_id
-            ).brokerage_rate,
+        # Initialize the use case
+        use_case = CreateQuoteUseCase(
+            repository=repository,
+            calculation_service=calc_service,
+            config_service=config_service,
         )
-
-        # Convert to response
-        response = quote_entity_to_response(
-            quote_entity,
+        
+        # Execute the use case
+        response = use_case.execute(
+            request=domain_request,
             user_id=current_user.user_id,
             organization_id=current_user.organization_id,
         )
-
-        # Add payment schedule to response
+        
+        # Convert to API response
         return QuoteResponse(
             quote_id=response.quote_id,
             loan_value=response.loan_value,
@@ -183,11 +176,11 @@ async def post_create_quote(
             monthly_payment=response.monthly_payment,
             payment_schedule=[
                 {
-                    "month": p.month,
-                    "amount": p.amount,
-                    "accumulated": p.accumulated,
+                    "month": p.month if hasattr(p, 'month') else p['month'],
+                    "amount": p.amount if hasattr(p, 'amount') else p['amount'],
+                    "accumulated": p.accumulated if hasattr(p, 'accumulated') else p['accumulated'],
                 }
-                for p in quote_entity.payment_schedule.monthly_payments
+                for p in response.payment_schedule
             ],
             status=response.status,
             created_at=response.created_at,
@@ -200,9 +193,11 @@ async def post_create_quote(
             detail=str(e),
         )
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Quote creation failed",
+            detail=f"Quote creation failed: {e}",
         )
 
 
@@ -244,6 +239,7 @@ async def get_list_quotes(
     from_date: Optional[datetime] = Query(None, description="Filter from date (ISO 8601 format)"),
     to_date: Optional[datetime] = Query(None, description="Filter to date (ISO 8601 format)"),
     current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> QuoteListResponse:
     """
     List all quotes for the authenticated user's organization.
@@ -311,14 +307,14 @@ async def get_list_quotes(
         if limit < 1 or limit > 500:
             raise ValueError("limit must be between 1 and 500")
 
-        # In production, would query real database via repository
-        # For MVP, return mock data structure
-        return QuoteListResponse(
-            items=[],
-            total=0,
+        repository = SQLQuoteRepository(db)
+        use_case = ListQuotesUseCase(repository=repository)
+        
+        return use_case.execute(
+            organization_id=current_user.organization_id,
+            user_id=current_user.user_id,
             page=page,
             limit=limit,
-            pages=0,
         )
 
     except ValueError as e:
@@ -348,6 +344,7 @@ async def get_list_quotes(
 async def get_quote_detail(
     quote_id: UUID,
     current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> QuoteResponse:
     """
     Get full details for a specific quote.
@@ -398,9 +395,14 @@ async def get_quote_detail(
         HTTPException(500): Unexpected server error
     """
     try:
-        # In production, would query database with org isolation check
-        # For MVP, return mock 404
-        raise ValueError(f"Quote {quote_id} not found")
+        repository = SQLQuoteRepository(db)
+        use_case = GetQuoteUseCase(repository=repository)
+        
+        return use_case.execute(
+            quote_id=quote_id,
+            user_id=current_user.user_id,
+            organization_id=current_user.organization_id,
+        )
 
     except ValueError as e:
         raise HTTPException(
@@ -432,6 +434,7 @@ async def get_quote_detail(
 async def delete_quote(
     quote_id: UUID,
     current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> None:
     """
     Soft-delete a quote (idempotent operation).
@@ -498,10 +501,25 @@ async def delete_quote(
         - Future Phase 2 may add: undelete feature, permanent deletion audit logs
     """
     try:
-        # In production, would use DeleteQuoteUseCase with real repository
-        # For MVP, return 204 (idempotent)
+        repository = SQLQuoteRepository(db)
+        use_case = DeleteQuoteUseCase(repository=repository)
+        
+        success = use_case.execute(
+            quote_id=quote_id,
+            user_id=current_user.user_id,
+            organization_id=current_user.organization_id,
+        )
+        
+        if not success:
+            raise ValueError(f"Quote {quote_id} not found")
+            
         return None
 
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
     except PermissionError as e:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

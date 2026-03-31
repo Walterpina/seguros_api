@@ -49,9 +49,13 @@ class SQLQuoteRepository(QuoteRepository):
         # Return domain entity with persisted ID
         return quote_entity
 
-    def get(self, quote_id: UUID) -> Optional[Quote]:
-        """Retrieve a quote by ID."""
-        quote_model = self.session.query(QuoteModel).filter_by(id=quote_id).first()
+    def get(self, quote_id: UUID, organization_id: Optional[UUID] = None) -> Optional[Quote]:
+        """Retrieve a quote by ID and optionally organization."""
+        query = self.session.query(QuoteModel).filter_by(id=quote_id)
+        if organization_id:
+            query = query.filter_by(organization_id=organization_id)
+        
+        quote_model = query.first()
 
         if not quote_model:
             return None
@@ -87,9 +91,13 @@ class SQLQuoteRepository(QuoteRepository):
 
         return quotes, total_count
 
-    def delete(self, quote_id: UUID) -> bool:
+    def delete(self, quote_id: UUID, organization_id: Optional[UUID] = None) -> bool:
         """Soft-delete a quote (set status='archived')."""
-        quote_model = self.session.query(QuoteModel).filter_by(id=quote_id).first()
+        query = self.session.query(QuoteModel).filter_by(id=quote_id)
+        if organization_id:
+            query = query.filter_by(organization_id=organization_id)
+            
+        quote_model = query.first()
 
         if not quote_model:
             return False

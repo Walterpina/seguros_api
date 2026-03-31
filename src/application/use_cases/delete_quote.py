@@ -37,10 +37,5 @@ class DeleteQuoteUseCase:
         Raises:
             PermissionError: If user/org not authorized (future)
         """
-        # Future: Implement permission checking
-        # quote = self.repository.get(quote_id)
-        # if quote and quote.organization_id != organization_id:
-        #     raise PermissionError(f"Not authorized to delete quote {quote_id}")
-
         # Soft-delete (set status='archived')
-        return self.repository.delete(quote_id)
+        return self.repository.delete(quote_id, organization_id=organization_id)

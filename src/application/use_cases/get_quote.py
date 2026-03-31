@@ -41,14 +41,10 @@ class GetQuoteUseCase:
             PermissionError: If user/org not authorized
         """
         # Retrieve quote
-        quote_entity = self.repository.get(quote_id)
+        quote_entity = self.repository.get(quote_id, organization_id=organization_id)
 
         if not quote_entity:
             raise ValueError(f"Quote {quote_id} not found")
-
-        # Future: Implement permission checking
-        # if quote.organization_id != organization_id:
-        #     raise PermissionError(f"Not authorized for quote {quote_id}")
 
         # Convert to response
         return quote_entity_to_response(quote_entity, user_id, organization_id)

@@ -31,6 +31,14 @@ def quote_entity_to_response(
         brokerage_amount=quote_entity.brokerage_amount,
         total_amount=quote_entity.total_amount,
         monthly_payment=quote_entity.monthly_payment,
+        payment_schedule=[
+            {
+                "month": p.month,
+                "amount": p.amount,
+                "accumulated": p.accumulated,
+            }
+            for p in quote_entity.payment_schedule.monthly_payments
+        ] if quote_entity.payment_schedule else [],
         status=quote_entity.status,
         created_at=quote_entity.created_at,
         updated_at=quote_entity.updated_at,
@@ -56,6 +64,7 @@ def orm_model_to_response(quote_model: QuoteModel) -> QuoteResponse:
         brokerage_amount=quote_model.brokerage_amount,
         total_amount=quote_model.total_amount,
         monthly_payment=quote_model.monthly_payment,
+        payment_schedule=[],  # Will be recalculated or left empty from ORM
         status=quote_model.status,
         created_at=quote_model.created_at,
         updated_at=quote_model.updated_at,

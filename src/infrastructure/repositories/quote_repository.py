@@ -28,7 +28,7 @@ class QuoteRepository(ABC):
         pass
 
     @abstractmethod
-    def get(self, quote_id: UUID) -> Optional[Quote]:
+    def get(self, quote_id: UUID, organization_id: Optional[UUID] = None) -> Optional[Quote]:
         """
         Retrieve a quote by ID.
 
@@ -65,7 +65,7 @@ class QuoteRepository(ABC):
         pass
 
     @abstractmethod
-    def delete(self, quote_id: UUID) -> bool:
+    def delete(self, quote_id: UUID, organization_id: Optional[UUID] = None) -> bool:
         """
         Soft-delete a quote (set status='archived').
 

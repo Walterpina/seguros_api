@@ -63,6 +63,7 @@ class QuoteResponse(BaseModel):
     brokerage_amount: Decimal = Field(..., description="Calculated brokerage")
     total_amount: Decimal = Field(..., description="Total amount (loan + premium + brokerage)")
     monthly_payment: Decimal = Field(..., description="Monthly payment amount")
+    payment_schedule: List[dict] = Field(default_factory=list, description="Payment schedule")
     status: str = Field("active", description="Quote status (active, archived, cancelled)")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
