@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     )
     log_level: str = Field(
         default="INFO",
-        regex="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$",
+        pattern="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$",
         alias="LOG_LEVEL",
     )
 
@@ -97,7 +97,7 @@ class Settings(BaseSettings):
     # Environment
     environment: str = Field(
         default="development",
-        regex="^(development|staging|production)$",
+        pattern="^(development|staging|production)$",
         alias="ENVIRONMENT",
     )
 

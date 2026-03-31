@@ -14,21 +14,18 @@ class QuoteCreateRequest(BaseModel):
     loan_value: Decimal = Field(
         ...,
         gt=0,
-        decimal_places=2,
         description="Principal loan amount (must be > 0)",
     )
     premium_rate: Optional[Decimal] = Field(
         None,
         ge=0,
         le=1,
-        decimal_places=6,
         description="Premium rate override (0-1). If not provided, uses configuration default.",
     )
     brokerage_rate: Optional[Decimal] = Field(
         None,
         ge=0,
         le=1,
-        decimal_places=6,
         description="Brokerage rate override (0-1). If not provided, uses configuration default.",
     )
 

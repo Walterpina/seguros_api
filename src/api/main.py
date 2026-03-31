@@ -120,6 +120,10 @@ async def global_exception_handler(request: Request, exc: Exception):
 async def startup():
     """Application startup event."""
     logger.info(f"Starting {settings.api_title} v{settings.api_version}")
+    logger.info(f"Environment: {settings.environment}")
+    logger.info(f"Database: {settings.database_url}")
+
+
 # Register error handlers
 register_error_handlers(app)
 
@@ -129,10 +133,6 @@ app.include_router(
     prefix="/api/v1",
     tags=["Quotes"],
 )
-
-
-    logger.info(f"Environment: {settings.environment}")
-    logger.info(f"Database: {settings.database_url}")
 
 
 @app.on_event("shutdown")

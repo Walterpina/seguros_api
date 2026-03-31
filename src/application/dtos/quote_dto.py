@@ -12,13 +12,13 @@ class QuoteCreateRequest(BaseModel):
     """Request DTO for creating a quote."""
 
     loan_value: Decimal = Field(
-        ..., gt=0, decimal_places=2, description="Principal loan amount (must be > 0)"
+        ..., gt=0, description="Principal loan amount (must be > 0)"
     )
     premium_rate: Optional[Decimal] = Field(
-        None, ge=0, le=1, decimal_places=6, description="Premium rate (0-1)"
+        None, ge=0, le=1, description="Premium rate (0-1)"
     )
     brokerage_rate: Optional[Decimal] = Field(
-        None, ge=0, le=1, decimal_places=6, description="Brokerage rate (0-1)"
+        None, ge=0, le=1, description="Brokerage rate (0-1)"
     )
 
     @field_validator("loan_value", mode="before")

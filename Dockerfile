@@ -1,5 +1,5 @@
 # Lending Insurance Quotation System - Multi-stage Docker build
-FROM python:3.9-slim as builder
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
@@ -17,7 +17,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Final stage
-FROM python:3.9-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 

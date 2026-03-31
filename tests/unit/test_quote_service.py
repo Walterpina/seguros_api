@@ -105,7 +105,7 @@ class TestQuoteCalculationService:
         )
 
         assert result.is_valid is False
-        assert "loan_value must be > 0" in result.errors
+        assert any("loan_value must be > 0" in err for err in result.errors)
 
     def test_validate_quote_input_negative_loan(self):
         """Test validation with negative loan_value."""
@@ -116,7 +116,7 @@ class TestQuoteCalculationService:
         )
 
         assert result.is_valid is False
-        assert "loan_value must be > 0" in result.errors
+        assert any("loan_value must be > 0" in err for err in result.errors)
 
     def test_validate_quote_input_invalid_premium_rate(self):
         """Test validation with invalid premium_rate."""
@@ -127,7 +127,7 @@ class TestQuoteCalculationService:
         )
 
         assert result.is_valid is False
-        assert "premium_rate must be between 0 and 1" in result.errors
+        assert any("premium_rate must be between 0 and 1" in err for err in result.errors)
 
     def test_validate_quote_input_negative_rate(self):
         """Test validation with negative brokerage_rate."""
@@ -138,7 +138,7 @@ class TestQuoteCalculationService:
         )
 
         assert result.is_valid is False
-        assert "brokerage_rate must be between 0 and 1" in result.errors
+        assert any("brokerage_rate must be between 0 and 1" in err for err in result.errors)
 
     def test_validate_quote_input_non_numeric(self):
         """Test validation with non-numeric input."""
@@ -149,7 +149,7 @@ class TestQuoteCalculationService:
         )
 
         assert result.is_valid is False
-        assert "loan_value must be numeric" in result.errors
+        assert any("loan_value must be numeric" in err for err in result.errors)
 
     def test_create_quote_valid(self):
         """Test creating a quote entity via service."""

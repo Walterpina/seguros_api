@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 
 from src.api.schemas.quote_schemas import ErrorResponse
@@ -53,6 +54,30 @@ def register_error_handlers(app: FastAPI) -> None:
     Args:
         app: FastAPI application instance
     """
+
+    @app.exception_handler(RequestValidationError)
+    async def request_validation_error_handler(request: Request, exc: RequestValidationError):
+        """Handle FastAPI RequestValidationError (422 Unprocessable Entity)."""
+        request_id = getattr(request.state, "request_id", str(uuid4()))
+
+        # Extract field errors
+        field_errors = {}
+        for error in exc.errors():
+            field_name = ".".join(str(x) for x in error["loc"][1:])
+            field_errors[field_name] = error["msg"]
+
+        logger.warning(
+            f"[{request_id}] Validation error: {field_errors}",
+            extra={"request_id": request_id},
+        )
+
+        return create_error_response(
+            code="VALIDATION_ERROR",
+            message="Request validation failed",
+            details=field_errors,
+            request_id=request_id,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
 
     @app.exception_handler(ValidationError)
     async def validation_error_handler(request: Request, exc: ValidationError):

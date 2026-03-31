@@ -112,6 +112,9 @@ class TestConfigurationService:
         monkeypatch.setenv("DEFAULT_PREMIUM_RATE", "0.05")
         monkeypatch.setenv("DEFAULT_BROKERAGE_RATE", "0.20")
 
+        from config.settings import get_settings
+        get_settings.cache_clear()
+
         service = ConfigurationService()
         rates = service.load_from_env()
 

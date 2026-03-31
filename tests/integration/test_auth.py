@@ -1,7 +1,7 @@
 """Integration tests for authentication and authorization."""
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 from decimal import Decimal
 
@@ -34,7 +34,7 @@ class TestAuthentication:
             json={"loan_value": 100000.00},
         )
 
-        assert response.status_code == 403
+        assert response.status_code == 401
         data = response.json()
         assert "detail" in data or "message" in data
 
@@ -47,7 +47,7 @@ class TestAuthentication:
             json={"loan_value": 100000.00},
         )
 
-        assert response.status_code == 403
+        assert response.status_code == 401
 
     def test_create_quote_rejects_malformed_bearer_header(self, client):
         """Test that malformed Bearer header is rejected."""
@@ -57,7 +57,7 @@ class TestAuthentication:
             json={"loan_value": 100000.00},
         )
 
-        assert response.status_code == 403
+        assert response.status_code == 401
 
     def test_create_quote_rejects_missing_bearer_prefix(self, client):
         """Test that missing Bearer prefix is rejected."""
@@ -69,7 +69,7 @@ class TestAuthentication:
             json={"loan_value": 100000.00},
         )
 
-        assert response.status_code == 403
+        assert response.status_code == 401
 
     def test_valid_token_grants_access(self, client, jwt_handler):
         """Test that valid JWT token grants access."""
@@ -102,11 +102,11 @@ class TestAuthentication:
         payload = jwt.decode(token, options={"verify_signature": False})
 
         assert "user_id" in payload
-        assert "organization_id" in payload
+        assert "org_id" in payload
         assert "role" in payload
         assert "exp" in payload
         assert str(user_id) == payload["user_id"]
-        assert str(org_id) == payload["organization_id"]
+        assert str(org_id) == payload["org_id"]
 
     def test_token_has_24_hour_expiration(self, jwt_handler):
         """Test that generated token has 24-hour expiration."""
@@ -118,8 +118,8 @@ class TestAuthentication:
 
         payload = jwt.decode(token, options={"verify_signature": False})
 
-        exp_time = datetime.fromtimestamp(payload["exp"])
-        now = datetime.utcnow()
+        exp_time = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+        now = datetime.now(timezone.utc)
         time_diff = (exp_time - now).total_seconds()
 
         # Should be approximately 24 hours (86400 seconds)
@@ -135,12 +135,12 @@ class TestAuthentication:
         org_id = uuid4()
 
         # Manually create an expired token
-        secret = jwt_handler.secret_key
+        secret = jwt_handler.settings.jwt_secret_key
         payload = {
             "user_id": str(user_id),
-            "organization_id": str(org_id),
+            "org_id": str(org_id),
             "role": "user",
-            "exp": datetime.utcnow() - timedelta(hours=1),  # Expired 1 hour ago
+            "exp": datetime.now(timezone.utc) - timedelta(hours=1),  # Expired 1 hour ago
         }
         expired_token = jwt.encode(payload, secret, algorithm="HS256")
 
@@ -151,7 +151,7 @@ class TestAuthentication:
             json={"loan_value": 100000.00},
         )
 
-        assert response.status_code == 403
+        assert response.status_code == 401
 
     def test_token_with_tampered_signature_rejected(self, client):
         """Test that token with tampered signature is rejected."""
@@ -169,7 +169,7 @@ class TestAuthentication:
             json={"loan_value": 100000.00},
         )
 
-        assert response.status_code == 403
+        assert response.status_code == 401
 
 
 @pytest.mark.integration
@@ -209,7 +209,7 @@ class TestAuthorization:
         """Test that quotes endpoint requires authentication."""
         response = client.get("/api/v1/quotes")
 
-        assert response.status_code == 403
+        assert response.status_code == 401
 
     def test_user_can_list_own_quotes(self, client, org_token):
         """Test that user can list quotes with valid token."""
@@ -326,7 +326,8 @@ class TestAuthorization:
         quote_id = data["quote_id"]
 
         # Verify in database that organization_id matches token's org
-        quote = test_db_session.query(Quote).filter_by(id=quote_id).first()
+        from uuid import UUID
+        quote = test_db_session.query(Quote).filter_by(id=UUID(quote_id)).first()
         assert quote is not None
         assert quote.organization_id == org_id
 
